@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* App tokens (neutral primary vibe) */
+:root {
+    --brand-accent:  #2563eb; /* Tailwind blue-600 */
+    --brand-accent-2:#1d4ed8; /* blue-700 */
+}
+
+.btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 h-10 text-sm font-medium
+    transition-[transform,background,box-shadow] active:scale-[0.98] focus:outline-none;
+}
+.btn-primary {
+    @apply text-white shadow-sm;
+    background: var(--brand-accent);
+}
+.btn-primary:hover { background: var(--brand-accent-2); }
+.btn-ghost { @apply text-neutral-700 hover:bg-neutral-100; }
+
+.card {
+    @apply rounded-2xl border border-neutral-200 bg-white shadow-sm;
+}
+.input {
+    @apply h-11 w-full rounded-xl border border-neutral-300 px-3 text-[15px] shadow-sm
+    focus:outline-none focus:ring-4 focus:ring-blue-100;
+}
+.label { @apply text-sm text-neutral-600 mb-1; }
