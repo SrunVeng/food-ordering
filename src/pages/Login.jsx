@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../store/auth";
 import { motion } from "framer-motion";
-import { Lock, User } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Loader2, UtensilsCrossed } from "lucide-react";
 
 export default function LoginPage() {
     const nav = useNavigate();
@@ -10,6 +10,7 @@ export default function LoginPage() {
 
     const [username, setU] = useState("");
     const [password, setP] = useState("");
+    const [showPw, setShowPw] = useState(false);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState("");
 
@@ -19,8 +20,11 @@ export default function LoginPage() {
         try {
             await login({ username, password });
             nav("/");
-        } catch (e) { setErr(e.message || "Login failed"); }
-        finally { setLoading(false); }
+        } catch (e) {
+            setErr(e.message || "Login failed");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const doRegister = async () => {
@@ -31,52 +35,93 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="mx-auto max-w-md pt-10">
-            <motion.div
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className="card p-6"
-            >
-                <h1 className="text-xl font-semibold">Sign in</h1>
-                <p className="text-sm text-neutral-600 mt-1">Username & password only.</p>
-
-                <form onSubmit={doLogin} className="mt-6 space-y-4">
-                    <div>
-                        <label className="label">Username</label>
-                        <div className="relative">
-                            <User className="size-4 absolute left-3 top-3 text-neutral-500" />
-                            <input className="input pl-9" value={username} onChange={e=>setU(e.target.value)} />
-                        </div>
+        <div className="min-h-screen grid place-items-center bg-neutral-50 px-4">
+            <div className="w-full max-w-sm">
+                {/* Centered logo */}
+                <div className="grid place-items-center mb-6">
+                    <div className="grid place-items-center size-14 rounded-2xl bg-white shadow-sm border">
+                        <UtensilsCrossed className="h-6 w-6 text-neutral-800" />
                     </div>
-                    <div>
-                        <label className="label">Password</label>
-                        <div className="relative">
-                            <Lock className="size-4 absolute left-3 top-3 text-neutral-500" />
-                            <input type="password" className="input pl-9" value={password} onChange={e=>setP(e.target.value)} />
+                    <h1 className="mt-3 text-lg font-semibold">Welcome back</h1>
+                    <p className="text-sm text-neutral-500">Sign in to continue</p>
+                </div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="w-full rounded-xl bg-white p-6 shadow"
+                >
+                    {err && (
+                        <div className="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">
+                            {err}
                         </div>
-                    </div>
+                    )}
 
-                    {err && <div className="text-sm text-red-600">{err}</div>}
+                    <form onSubmit={doLogin} className="space-y-4">
+                        {/* Username */}
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
+                            <input
+                                type="text"
+                                className="w-full rounded-md border border-neutral-300 pl-9 pr-3 py-2 text-sm focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+                                placeholder="Username"
+                                value={username}
+                                onChange={(e) => setU(e.target.value)}
+                                autoComplete="username"
+                            />
+                        </div>
 
-                    <div className="flex gap-2">
-                        <button className="btn btn-primary w-full" disabled={loading}>
-                            {loading ? "Please wait..." : "Login"}
+                        {/* Password */}
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
+                            <input
+                                type={showPw ? "text" : "password"}
+                                className="w-full rounded-md border border-neutral-300 pl-9 pr-9 py-2 text-sm focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setP(e.target.value)}
+                                autoComplete="current-password"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPw(!showPw)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                                aria-label={showPw ? "Hide password" : "Show password"}
+                            >
+                                {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+
+                        {/* Actions (optional) */}
+                        <div className="flex items-center justify-between text-sm">
+                            <label className="flex items-center gap-2">
+                                <input type="checkbox" className="h-4 w-4 text-neutral-600" />
+                                Remember me
+                            </label>
+                            <Link to="/forgot" className="text-neutral-600 hover:underline">
+                                Forgot password?
+                            </Link>
+                        </div>
+
+                        {/* Buttons */}
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-2 rounded-md bg-neutral-900 text-white py-2 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+                        >
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Login"}
                         </button>
                         <button
                             type="button"
                             onClick={doRegister}
-                            className="btn btn-ghost w-36"
                             disabled={loading}
-                            title="Register a new account"
+                            className="w-full rounded-md border border-neutral-300 py-2 text-sm font-medium hover:bg-neutral-100 disabled:opacity-50"
                         >
                             Register
                         </button>
-                    </div>
-
-                    <div className="text-xs text-neutral-500 text-center mt-2">
-                        {/* When your API is ready, replace login/register in src/lib/api.js */}
-                    </div>
-                </form>
-            </motion.div>
+                    </form>
+                </motion.div>
+            </div>
         </div>
     );
 }
