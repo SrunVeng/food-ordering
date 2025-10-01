@@ -63,7 +63,6 @@ export default function Dashboard() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Target className="size-5 text-neutral-700" />
                     <h1 className="text-xl font-semibold tracking-tight">Groups</h1>
                 </div>
                 <Button onClick={() => setCreating(true)} aria-haspopup="dialog" aria-expanded={creating}>
@@ -165,7 +164,6 @@ function EmptyState() {
                         <div className="text-sm text-neutral-500">Create your first lunch group to get started.</div>
                     </div>
                 </div>
-                <Link to="#" className="text-sm text-neutral-500 hover:text-neutral-700">How it works</Link>
             </div>
         </div>
     );

@@ -42,8 +42,7 @@ export default function LoginPage() {
                     <div className="grid place-items-center size-14 rounded-2xl bg-white shadow-sm border">
                         <UtensilsCrossed className="h-6 w-6 text-neutral-800" />
                     </div>
-                    <h1 className="mt-3 text-lg font-semibold">Welcome back</h1>
-                    <p className="text-sm text-neutral-500">Sign in to continue</p>
+                    <h1 className="mt-3 text-lg font-semibold">Welcome Nham Ey</h1>
                 </div>
 
                 <motion.div
