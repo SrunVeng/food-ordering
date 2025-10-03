@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../store/auth";
 import { motion } from "framer-motion";
 import { User, Lock, Eye, EyeOff, Loader2, UtensilsCrossed } from "lucide-react";
 
 export default function LoginPage() {
     const nav = useNavigate();
-    const { login, register } = useAuth();
+    const { login } = useAuth();
+    const { state } = useLocation();
 
     const [username, setU] = useState("");
     const [password, setP] = useState("");
@@ -27,13 +28,6 @@ export default function LoginPage() {
         }
     };
 
-    const doRegister = async () => {
-        setErr(""); setLoading(true);
-        try { await register({ username, password }); }
-        catch (e) { setErr(e.message || "Register failed"); }
-        finally { setLoading(false); }
-    };
-
     return (
         <div className="min-h-screen grid place-items-center bg-neutral-50 px-4">
             <div className="w-full max-w-sm">
@@ -50,6 +44,13 @@ export default function LoginPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="w-full rounded-xl bg-white p-6 shadow"
                 >
+                    {/* Success message from register redirect */}
+                    {state?.msg && (
+                        <div className="mb-3 text-sm text-green-700 bg-green-50 p-2 rounded">
+                            {state.msg}
+                        </div>
+                    )}
+
                     {err && (
                         <div className="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">
                             {err}
@@ -91,7 +92,7 @@ export default function LoginPage() {
                             </button>
                         </div>
 
-                        {/* Actions (optional) */}
+                        {/* Actions */}
                         <div className="flex items-center justify-between text-sm">
                             <label className="flex items-center gap-2">
                                 <input type="checkbox" className="h-4 w-4 text-neutral-600" />
@@ -110,14 +111,14 @@ export default function LoginPage() {
                         >
                             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Login"}
                         </button>
-                        <button
-                            type="button"
-                            onClick={doRegister}
-                            disabled={loading}
-                            className="w-full rounded-md border border-neutral-300 py-2 text-sm font-medium hover:bg-neutral-100 disabled:opacity-50"
+
+                        {/* Go to Register page */}
+                        <Link
+                            to="/register"
+                            className="w-full inline-flex items-center justify-center rounded-md border border-neutral-300 py-2 text-sm font-medium hover:bg-neutral-100"
                         >
-                            Register
-                        </button>
+                            Create an account
+                        </Link>
                     </form>
                 </motion.div>
             </div>

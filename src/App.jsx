@@ -1,14 +1,14 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./store/auth";
 import LoginPage from "./pages/Login.jsx";
+import RegisterPage from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import GroupPage from "./pages/Group.jsx";
 import Header from "./components/Header.jsx";
 
-function Protected({ children }) {
+function ProtectedRoute({ children }) {
     const { token } = useAuth();
-    if (!token) return <Navigate to="/login" replace />;
-    return children;
+    return token ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
@@ -21,23 +21,27 @@ export default function App() {
             <main className="mx-auto max-w-6xl p-4 sm:p-6">
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+
                     <Route
                         path="/"
                         element={
-                            <Protected>
+                            <ProtectedRoute>
                                 <Dashboard />
-                            </Protected>
+                            </ProtectedRoute>
                         }
                     />
+
                     <Route
                         path="/groups/:groupId"
                         element={
-                            <Protected>
+                            <ProtectedRoute>
                                 <GroupPage />
-                            </Protected>
+                            </ProtectedRoute>
                         }
                     />
-                    <Route path="*" element={<Navigate to={token ? "/" : "/login"} />} />
+
+                    <Route path="*" element={<Navigate to={token ? "/" : "/login"} replace />} />
                 </Routes>
             </main>
         </div>
