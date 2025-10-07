@@ -47,9 +47,7 @@ export default function RegisterPage() {
 
         setLoading(true);
         try {
-            // Exclude confirmPassword from payload
-            const { confirmPassword, ...payload } = form;
-            await doRegister(payload);
+            await doRegister(form);
             nav("/login", { state: { msg: "Account created. You can now log in." }, replace: true });
         } catch (e) {
             setErr(e.message || "Register failed");

@@ -1,41 +1,48 @@
-// api.js — Central API layer (mock now, easy to swap to real later)
+import axios from "axios";
 
-// --- Real client (commented for now) ---
-// import axios from "axios";
-// export const api = axios.create({ baseURL: "http://localhost:4000" });
-// api.interceptors.request.use(cfg => {
-//   const token = localStorage.getItem("token");
-//   if (token) cfg.headers.Authorization = `Bearer ${token}`;
-//   return cfg;
-// });
+
+const URL = import.meta.env.VITE_API_BASE_URL;
+
+export const api = axios.create({ baseURL: URL });
+api.interceptors.request.use(cfg => {
+  const token = localStorage.getItem("token");
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
+});
 
 /** ---------------- AUTH ---------------- */
 export async function loginApi({ username, password }) {
-    // TODO (real): const { data } = await api.post('/auth/login', { username, password });
-    // return data;
-
-    await wait(400);
-    if (!username || !password) throw new Error("Invalid credentials");
-
-    // Stable id for returning users in mock mode
-    const existing = findUserByName(username);
-    const user = existing || { id: cryptoRandom(), username };
-
-    upsertUser(user);
-
-    return {
-        token: "mock-token-" + Math.random().toString(36).slice(2),
-        user,
-    };
+    if (!username || !password) throw new Error("Invalid input");
+    try {
+        const { data } = await api.post('/api/v1/auth/user/login', { username, password });
+        const tokenType = data?.data?.tokenType;
+        const accessToken = data?.data?.accessToken;
+        const refreshToken = data?.data?.refreshToken;
+        return { tokenType, accessToken, refreshToken};
+    } catch (err) {
+        const status = err?.response?.status;
+        if (status === 401) {
+            throw new Error("Invalid username or password");
+        }
+        throw err;
+    }
 }
 
-export async function registerApi({ username, password }) {
-    // TODO (real): await api.post('/auth/register', { username, password });
-    await wait(400);
-    if (!username || !password) throw new Error("Invalid input");
-
-    upsertUser({ id: cryptoRandom(), username });
-    return { ok: true };
+export async function registerApi({ firstName, lastName, username, confirmPassword,password, phoneNumber, email }) {
+    if(!firstName || !lastName || !username || !password) {
+        throw new Error("Invalid input");
+    }
+    try {
+        await api.post('/api/v1/auth/user/register', { firstName, lastName , username, confirmPassword,password, phoneNumber, email });
+        return { ok: true };
+    } catch (err) {
+        const res  = err?.response;
+        if (res) {
+            const msg = res.data?.data?.errorMsg;
+            throw new Error(msg);
+        }
+        throw new Error("Network Error");
+    }
 }
 
 /** ---------------- GROUPS ---------------- */
@@ -177,10 +184,6 @@ export async function fetchRestaurantsApi() {
 }
 
 /** ---------------- USERS (mock directory) ---------------- */
-export function fetchUsersApi() {
-    return Object.values(getUsersDict());
-}
-
 function getUsersDict() {
     try {
         return JSON.parse(localStorage.getItem("USERS") || "{}");
@@ -188,22 +191,7 @@ function getUsersDict() {
         return {};
     }
 }
-function setUsersDict(dict) {
-    localStorage.setItem("USERS", JSON.stringify(dict));
-}
-function upsertUser(u) {
-    const dict = getUsersDict();
-    if (!u?.id) return;
-    dict[u.id] = { ...(dict[u.id] || {}), ...u };
-    setUsersDict(dict);
-}
-function findUserByName(username) {
-    const dict = getUsersDict();
-    for (const id of Object.keys(dict)) {
-        if (dict[id]?.username === username) return dict[id];
-    }
-    return null;
-}
+
 function fallbackName(id) {
     return "User " + String(id).slice(-4);
 }
