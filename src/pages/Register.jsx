@@ -115,7 +115,7 @@ function OTPInput({ value, onChange, length = 6, autoFocus = true, name = "otp" 
 export default function RegisterPage() {
     const nav = useNavigate();
     const { registerStart, registerVerify } = useAuth();
-
+    const MIN_PW_LEN = 8;
     const [form, setForm] = useState({
         firstName: "",
         lastName: "",
@@ -139,6 +139,7 @@ export default function RegisterPage() {
     };
 
     const pwMismatch = form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
+    const pwTooShort = form.password.length > 0 && form.password.length < MIN_PW_LEN;
     const requiredFilled =
         form.firstName &&
         form.lastName &&
@@ -147,7 +148,7 @@ export default function RegisterPage() {
         form.confirmPassword &&
         form.phoneNumber &&
         form.email;
-    const canSubmit = requiredFilled && !pwMismatch;
+    const canSubmit = requiredFilled && !pwMismatch && form.password.length >= MIN_PW_LEN && form.confirmPassword.length >= MIN_PW_LEN;
 
     const submitStart = async (e) => {
         e.preventDefault();
@@ -320,7 +321,9 @@ export default function RegisterPage() {
                                         autoComplete="new-password"
                                         className="w-full rounded-md border border-neutral-300 pl-9 pr-9 py-2 text-sm focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                                         placeholder="••••••••"
-                                        minLength={6}
+                                        minLength={MIN_PW_LEN}
+                                        aria-invalid={pwTooShort}
+                                        aria-describedby="pw-too-short"
                                         required
                                     />
                                     <button
@@ -332,6 +335,12 @@ export default function RegisterPage() {
                                         {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
                                 </div>
+                                {pwTooShort && (
+                                    <p id="pw-too-short" className="mt-1 text-xs text-red-600">
+                                        Password must be at least {MIN_PW_LEN} characters.
+                                                                       </p>
+                                )}
+
                             </div>
 
                             {/* Confirm Password */}
@@ -349,7 +358,7 @@ export default function RegisterPage() {
                                             pwMismatch ? "border-red-400 focus:border-red-500 focus:ring-red-500" : "border-neutral-300"
                                         }`}
                                         placeholder="Repeat password"
-                                        minLength={6}
+                                        minLength={MIN_PW_LEN}
                                         required
                                         aria-invalid={pwMismatch}
                                         aria-describedby="pw-mismatch"
