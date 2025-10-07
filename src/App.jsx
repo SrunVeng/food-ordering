@@ -5,6 +5,8 @@ import RegisterPage from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import GroupPage from "./pages/Group.jsx";
 import Header from "./components/Header.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 
 function ProtectedRoute({ children }) {
     const { token } = useAuth();
@@ -22,7 +24,8 @@ export default function App() {
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
-
+                    <Route path="/forgot" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route
                         path="/"
                         element={

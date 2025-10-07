@@ -24,27 +24,85 @@ export async function loginApi({ username, password }) {
         if (status === 401) {
             throw new Error("Invalid username or password");
         }
-        throw err;
+        throw new Error(extractErrorMessage(err));
     }
 }
 
-export async function registerApi({ firstName, lastName, username, confirmPassword,password, phoneNumber, email }) {
-    if(!firstName || !lastName || !username || !password) {
-        throw new Error("Invalid input");
+export async function registerApi({ firstName, lastName, username, password, confirmPassword, phoneNumber, email }) {
+    if (!firstName || !lastName || !username || !password || !confirmPassword || !phoneNumber || !email) {
+        throw new Error("Please fill in all required fields.");
+    }
+    if (password !== confirmPassword) {
+        throw new Error("Passwords do not match.");
     }
     try {
-        await api.post('/api/v1/auth/user/register', { firstName, lastName , username, confirmPassword,password, phoneNumber, email });
+        // Your controller: POST /api/v1/auth/user/register
+        await api.post("/api/v1/auth/user/register", {
+            firstName,
+            lastName,
+            username,
+            password,
+            confirmPassword,
+            phoneNumber,
+            email,
+        });
         return { ok: true };
     } catch (err) {
-        const res  = err?.response;
-        if (res) {
-            const msg = res.data?.data?.errorMsg;
-            throw new Error(msg);
-        }
-        throw new Error("Network Error");
+        throw new Error(extractErrorMessage(err));
     }
 }
 
+export async function registerVerifyApi(payload) {
+    const {
+        firstName,
+        lastName,
+        username,
+        password,
+        confirmPassword,
+        phoneNumber,
+        email,
+        otp,
+    } = payload || {};
+
+    if (!email || !username || !otp) throw new Error("Missing email, username, or OTP.");
+
+    try {
+        await api.post("/api/v1/auth/user/register/verify", {
+            email,
+            username,
+            otp,
+            firstName,
+            lastName,
+            phoneNumber,
+            password,
+            confirmPassword,
+        });
+        return { ok: true };
+    } catch (err) {
+        throw new Error(extractErrorMessage(err, "OTP verification failed"));
+    }
+}
+
+export async function requestPasswordResetApi(email) {
+    try {
+        await api.post("/api/v1/auth/user/reset-password/request", { email });
+    } catch (err) {
+        throw new Error(extractErrorMessage(err));
+    }
+}
+
+
+export async function performPasswordResetApi({ token, newPassword, confirmPassword }) {
+    if (!token) throw new Error("Missing reset token");
+    if (!newPassword || newPassword.length < 8) throw new Error("Password must be at least 8 characters");
+    if (newPassword !== confirmPassword) throw new Error("Passwords do not match");
+    try {
+        await api.post("/api/v1/auth/user/reset-password/confirm", {token, newPassword, confirmPassword});
+    } catch (err) {
+        throw new Error(extractErrorMessage(err));
+    }
+
+}
 /** ---------------- GROUPS ---------------- */
 
 /** Fetch all groups (adds memberDetails if missing for old records) */
@@ -223,6 +281,20 @@ function ensureMemberDetails(g, usersDict) {
     }
     md = members.map((id) => map.get(id));
     return { ...g, members, memberDetails: md };
+}
+
+function extractErrorMessage(err, fallback = "Request failed") {
+    // Try multiple common backend shapes safely
+    const r = err?.response;
+    return (
+        r?.data?.data?.errorMsg ||
+        r?.data?.data?.message ||
+        r?.data?.message ||
+        r?.data?.error ||
+        r?.statusText ||
+        err?.message ||
+        fallback
+    );
 }
 
 /** ---------------- Utilities ---------------- */
