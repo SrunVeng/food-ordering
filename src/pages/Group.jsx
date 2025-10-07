@@ -2,9 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-    ArrowLeft, CheckCircle2, Crown, Plus, Send, Users, Store, DoorOpen, Save
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Crown, Plus, Send, Users, Store, DoorOpen, Save, MapPin, Share2 } from "lucide-react";
 
 import { useAuth } from "../store/auth";
 import { useGroups } from "../store/group.js";
@@ -13,6 +11,7 @@ import { Button } from "../ui/Button.jsx";
 import { useToast } from "../ui/toast/ToastContext.jsx";
 import { useConfirm } from "../components/ConfirmGuard.jsx";
 import { applyTheme, theme as defaultTheme } from "../theme.js";
+import MapPreview from "../components/MapPreview.jsx";
 
 import {
     formatMoney,
@@ -30,7 +29,6 @@ export default function GroupPage() {
     const toast = useToast();
     const confirm = useConfirm();
 
-    // Apply theme once
     useEffect(() => { applyTheme(defaultTheme); }, []);
 
     const {
@@ -52,27 +50,25 @@ export default function GroupPage() {
     const isOwner = g?.ownerId === user.id;
     const isMember = g?.members?.includes(user.id);
 
+    const meeting = g?.meeting || g?.meetingPlace || null;
+
     const restaurant = useMemo(
         () => restaurants.find((r) => r.id === g?.restaurantId),
         [restaurants, g?.restaurantId]
     );
     const dishes = useMemo(() => menuMap[g?.restaurantId] || [], [menuMap, g?.restaurantId]);
 
-    // Countdown
     const { open: orderOpen, min: leftMin, sec: leftSec } = useCountdown(g?.deadlineAt);
 
-    // Local selections
     const [mySelections, setMySelections] = useState({});
     const [saving, setSaving] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // Members
     const memberList = useMemberList({ group: g, usersMap, currentUser: user });
     const AVATAR_LIMIT = 6;
     const avatars = memberList.slice(0, AVATAR_LIMIT);
     const moreCount = Math.max(0, memberList.length - AVATAR_LIMIT);
 
-    // Merge picks & summaries
     const mergedPicks = useMemo(() => mergePicks({
         group: g,
         mySelections,
@@ -86,7 +82,6 @@ export default function GroupPage() {
         nameResolver: (id) => resolveDisplayName({ userId: id, currentUser: user, usersMap, group: g })
     }), [mergedPicks, dishes, user, usersMap, g]);
 
-    // Pricing
     const total = useMemo(
         () =>
             Object.entries(mySelections).reduce((sum, [dishId, qty]) => {
@@ -180,6 +175,19 @@ export default function GroupPage() {
         }
     }
 
+    function copyCoords() {
+        if (!meeting?.lat || !meeting?.lng) return;
+        const text = `${meeting.lat}, ${meeting.lng}`;
+        navigator.clipboard?.writeText(text).then(() => {
+            toast.show("Coordinates copied.", { type: "info" });
+        });
+    }
+
+    function osmLink() {
+        if (!meeting?.lat || !meeting?.lng) return "#";
+        return `https://www.openstreetmap.org/?mlat=${meeting.lat}&mlon=${meeting.lng}#map=17/${meeting.lat}/${meeting.lng}`;
+    }
+
     if (notFound) {
         return (
             <div className="max-w-3xl mx-auto">
@@ -193,7 +201,7 @@ export default function GroupPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header Card (cleaner design, no ribbon) */}
+            {/* Header Card */}
             <div className="rounded-2xl border bg-white p-4 sm:p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -213,7 +221,7 @@ export default function GroupPage() {
                         <div className="mt-3 flex items-center flex-wrap gap-4">
                             <div className="flex items-center gap-3">
                                 <div className="flex -space-x-2">
-                                    {avatars.map((m) => (
+                                    {memberList.slice(0, 6).map((m) => (
                                         <div
                                             key={m.id}
                                             className="relative z-0 grid size-7 place-items-center rounded-full border border-white bg-neutral-900 text-white text-[11px] font-medium"
@@ -279,7 +287,7 @@ export default function GroupPage() {
                 </div>
             </div>
 
-            {/* Restaurant Card (no hungry button) */}
+            {/* Restaurant Card */}
             <section className="space-y-3">
                 <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
                     <span className="size-1.5 rounded-full bg-neutral-800" />
@@ -304,6 +312,52 @@ export default function GroupPage() {
 
                 <div className="text-xs text-neutral-500">(Set by the group owner when creating the group.)</div>
             </section>
+
+            {/* Meeting place */}
+            {meeting?.lat && meeting?.lng && (
+                <section className="space-y-3">
+                    <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
+                        <span className="size-1.5 rounded-full bg-neutral-800" />
+                        Meeting place
+                    </h2>
+
+                    <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="text-sm text-neutral-700 inline-flex items-center gap-2">
+                                <MapPin className="size-4" />
+                                <span className="font-medium">
+                  {meeting.label ? meeting.label : "Pinned location"}
+                </span>
+                                <span className="text-neutral-500">
+                  ({meeting.lat.toFixed(5)}, {meeting.lng.toFixed(5)})
+                </span>
+                            </div>
+                            <div className="flex gap-2">
+                                <a
+                                    href={osmLink()}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-sm hover:bg-neutral-50"
+                                    title="Open in OpenStreetMap"
+                                >
+                                    <Share2 className="size-4" />
+                                    Open in OSM
+                                </a>
+                                <button
+                                    className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-sm hover:bg-neutral-50"
+                                    onClick={copyCoords}
+                                >
+                                    Copy coords
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-3">
+                            <MapPreview point={{ lat: meeting.lat, lng: meeting.lng }} />
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Dish picker */}
             <section className="space-y-3">

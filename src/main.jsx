@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./index.css";
+import "leaflet/dist/leaflet.css";
 
 import { ConfirmProvider } from "./components/ConfirmGuard.jsx"; // named export
 import { ToastProvider } from "./ui/toast/ToastContext.jsx";   // your Toast code
