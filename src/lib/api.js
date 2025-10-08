@@ -103,6 +103,18 @@ export async function performPasswordResetApi({ token, newPassword, confirmPassw
     }
 
 }
+
+export async function adminSetPassword({ token, password }) {
+    try {
+        const { data } = await api.post("/auth/admin/set-password", { token, password });
+        return data;
+    } catch (err) {
+        throw new Error(extractErrorMessage(err));
+    }
+}
+
+
+
 /** ---------------- GROUPS ---------------- */
 
 /** Fetch all groups (adds memberDetails if missing for old records) */
