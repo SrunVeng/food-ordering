@@ -5,7 +5,7 @@ const URL = import.meta.env.VITE_API_BASE_URL;
 
 export const api = axios.create({ baseURL: URL });
 api.interceptors.request.use(cfg => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("accessToken");
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
   return cfg;
 });
@@ -28,8 +28,8 @@ export async function loginApi({ username, password }) {
     }
 }
 
-export async function registerApi({ firstName, lastName, username, password, confirmPassword, phoneNumber, email }) {
-    if (!firstName || !lastName || !username || !password || !confirmPassword || !phoneNumber || !email) {
+export async function registerApi({ firstName, lastName, username, password, confirmPassword, phoneNumber, email,gender,dob }) {
+    if (!firstName || !lastName || !username || !password || !confirmPassword || !phoneNumber || !email || !gender || !dob) {
         throw new Error("Please fill in all required fields.");
     }
     if (password !== confirmPassword) {
@@ -44,11 +44,44 @@ export async function registerApi({ firstName, lastName, username, password, con
             password,
             confirmPassword,
             phoneNumber,
+            gender,
             email,
+            dob,
         });
         return { ok: true };
     } catch (err) {
         throw new Error(extractErrorMessage(err));
+    }
+}
+
+export async function deleteAccountApi({ username }) {
+    if (!username) throw new Error("Missing username");
+    try {
+        const { data } = await api.delete("/api/v1/user/delete-account", {
+            params: { username },
+        });
+        return data?.data ?? { ok: true };
+    } catch (err) {
+        throw new Error(extractErrorMessage(err, "Failed to delete account"));
+    }
+}
+
+export async function updateAccountApi(payload) {
+    if (!payload) throw new Error("Missing payload");
+    try {
+        const { data } = await api.put("/api/v1/user/update-profile", payload);
+        return data?.data ?? { ok: true };
+    } catch (err) {
+        throw new Error(extractErrorMessage(err, "Failed to update account"));
+    }
+}
+
+export async function fetchMyProfile() {
+    try {
+        const { data } = await api.get("/api/v1/user/get-by-username");
+        return data?.data;
+    } catch (err) {
+        throw new Error(extractErrorMessage(err, "Failed to load profile"));
     }
 }
 
@@ -61,6 +94,8 @@ export async function registerVerifyApi(payload) {
         confirmPassword,
         phoneNumber,
         email,
+        dob,
+        gender,
         otp,
     } = payload || {};
 
@@ -73,6 +108,8 @@ export async function registerVerifyApi(payload) {
             otp,
             firstName,
             lastName,
+            dob,
+            gender,
             phoneNumber,
             password,
             confirmPassword,

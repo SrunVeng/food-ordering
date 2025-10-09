@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../store/auth";
 import { motion } from "framer-motion";
-import { User, Mail, Phone, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { User, Mail, Phone, Lock, Eye, EyeOff, ArrowLeft, Calendar } from "lucide-react";
 
 /** ---------- Reusable 6-box OTP input (JSX) ---------- */
 function OTPInput({ value, onChange, length = 6, autoFocus = true, name = "otp" }) {
@@ -69,7 +69,6 @@ function OTPInput({ value, onChange, length = 6, autoFocus = true, name = "otp" 
                             clearChar(i);
                             return;
                         }
-                        // Some mobile keyboards insert multiple digits at once
                         if (v.length > 1) {
                             const digits = v.replace(/\D/g, "");
                             if (!digits) return;
@@ -116,6 +115,7 @@ export default function RegisterPage() {
     const nav = useNavigate();
     const { registerStart, registerVerify } = useAuth();
     const MIN_PW_LEN = 8;
+
     const [form, setForm] = useState({
         firstName: "",
         lastName: "",
@@ -124,6 +124,8 @@ export default function RegisterPage() {
         confirmPassword: "",
         phoneNumber: "",
         email: "",
+        gender: "",
+        dob: "", // <-- NEW (string)
     });
 
     const [showPw, setShowPw] = useState(false);
@@ -140,6 +142,7 @@ export default function RegisterPage() {
 
     const pwMismatch = form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
     const pwTooShort = form.password.length > 0 && form.password.length < MIN_PW_LEN;
+
     const requiredFilled =
         form.firstName &&
         form.lastName &&
@@ -147,8 +150,15 @@ export default function RegisterPage() {
         form.password &&
         form.confirmPassword &&
         form.phoneNumber &&
-        form.email;
-    const canSubmit = requiredFilled && !pwMismatch && form.password.length >= MIN_PW_LEN && form.confirmPassword.length >= MIN_PW_LEN;
+        form.email &&
+        form.gender &&
+        form.dob; // <-- include DOB
+
+    const canSubmit =
+        requiredFilled &&
+        !pwMismatch &&
+        form.password.length >= MIN_PW_LEN &&
+        form.confirmPassword.length >= MIN_PW_LEN;
 
     const submitStart = async (e) => {
         e.preventDefault();
@@ -165,7 +175,8 @@ export default function RegisterPage() {
 
         setLoading(true);
         try {
-            await registerStart(form); // calls /user/register (sends OTP)
+            // Must send dob along with the rest — your useAuth.registerStart should call registerApi internally.
+            await registerStart(form);
             setStep("otp");
         } catch (e) {
             setErr(e?.message || "Register failed");
@@ -194,6 +205,8 @@ export default function RegisterPage() {
                 lastName: form.lastName,
                 phoneNumber: form.phoneNumber,
                 password: form.password,
+                gender: form.gender,
+                dob: form.dob, // <-- carry DOB on verify if backend expects it there too
             });
             nav("/login", { state: { msg: "Account created. You can now log in." }, replace: true });
         } catch (e) {
@@ -226,7 +239,7 @@ export default function RegisterPage() {
                     {step === "form" ? (
                         <form onSubmit={submitStart} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* First Name */}
-                            <div className="sm:col-span-1">
+                            <div>
                                 <label className="block text-xs font-medium text-neutral-600 mb-1">First name *</label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
@@ -242,7 +255,7 @@ export default function RegisterPage() {
                             </div>
 
                             {/* Last Name */}
-                            <div className="sm:col-span-1">
+                            <div>
                                 <label className="block text-xs font-medium text-neutral-600 mb-1">Last name *</label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
@@ -308,6 +321,39 @@ export default function RegisterPage() {
                                 </div>
                             </div>
 
+                            {/* Gender */}
+                            <div className="sm:col-span-2">
+                                <label className="block text-xs font-medium text-neutral-600 mb-1">Gender *</label>
+                                <select
+                                    name="gender"
+                                    value={form.gender}
+                                    onChange={onChange}
+                                    required
+                                    className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 bg-white"
+                                    aria-label="Select gender"
+                                >
+                                    <option value="" disabled>Select gender</option>
+                                    <option value="F">F</option>
+                                    <option value="M">M</option>
+                                </select>
+                            </div>
+
+                            {/* DOB (string) */}
+                            <div className="sm:col-span-2">
+                                <label className="block text-xs font-medium text-neutral-600 mb-1">Date of birth *</label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
+                                    <input
+                                        type="date"
+                                        name="dob"
+                                        value={form.dob}
+                                        onChange={onChange}
+                                        className="w-full rounded-md border border-neutral-300 pl-9 pr-3 py-2 text-sm focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
                             {/* Password */}
                             <div className="sm:col-span-2">
                                 <label className="block text-xs font-medium text-neutral-600 mb-1">Password *</label>
@@ -321,9 +367,8 @@ export default function RegisterPage() {
                                         autoComplete="new-password"
                                         className="w-full rounded-md border border-neutral-300 pl-9 pr-9 py-2 text-sm focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                                         placeholder="••••••••"
-                                        minLength={MIN_PW_LEN}
-                                        aria-invalid={pwTooShort}
-                                        aria-describedby="pw-too-short"
+                                        minLength={8}
+                                        aria-invalid={form.password && form.password.length < 8}
                                         required
                                     />
                                     <button
@@ -335,12 +380,9 @@ export default function RegisterPage() {
                                         {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
                                 </div>
-                                {pwTooShort && (
-                                    <p id="pw-too-short" className="mt-1 text-xs text-red-600">
-                                        Password must be at least {MIN_PW_LEN} characters.
-                                                                       </p>
+                                {form.password && form.password.length < 8 && (
+                                    <p className="mt-1 text-xs text-red-600">Password must be at least 8 characters.</p>
                                 )}
-
                             </div>
 
                             {/* Confirm Password */}
@@ -355,13 +397,14 @@ export default function RegisterPage() {
                                         onChange={onChange}
                                         autoComplete="new-password"
                                         className={`w-full rounded-md border pl-9 pr-9 py-2 text-sm focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 ${
-                                            pwMismatch ? "border-red-400 focus:border-red-500 focus:ring-red-500" : "border-neutral-300"
+                                            form.confirmPassword && form.password !== form.confirmPassword
+                                                ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+                                                : "border-neutral-300"
                                         }`}
                                         placeholder="Repeat password"
-                                        minLength={MIN_PW_LEN}
+                                        minLength={8}
                                         required
-                                        aria-invalid={pwMismatch}
-                                        aria-describedby="pw-mismatch"
+                                        aria-invalid={form.confirmPassword && form.password !== form.confirmPassword}
                                     />
                                     <button
                                         type="button"
@@ -372,10 +415,8 @@ export default function RegisterPage() {
                                         {showPw2 ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
                                 </div>
-                                {pwMismatch && (
-                                    <p id="pw-mismatch" className="mt-1 text-xs text-red-600">
-                                        Passwords do not match.
-                                    </p>
+                                {form.confirmPassword && form.password !== form.confirmPassword && (
+                                    <p className="mt-1 text-xs text-red-600">Passwords do not match.</p>
                                 )}
                             </div>
 
@@ -418,7 +459,7 @@ export default function RegisterPage() {
                                 type="button"
                                 onClick={async () => {
                                     try {
-                                        await registerStart(form); // resend code
+                                        await registerStart(form); // resend with dob & gender included
                                     } catch (e) {
                                         setErr(e?.message || "Couldn’t resend code");
                                     }
