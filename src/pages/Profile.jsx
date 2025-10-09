@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../store/auth";
-import { fetchMyProfile, updateAccountApi, deleteAccountApi } from "../lib/api.js";
+import { fetchMyProfile, updateAccountApi, updateAccountVerifyApi, deleteAccountApi } from "../lib/api.js";
 import { motion } from "framer-motion";
 import { ArrowLeft, Save, Pencil, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -8,11 +8,7 @@ import { Link, useNavigate } from "react-router-dom";
 /** Convert arbitrary date strings to YYYY-MM-DD for <input type="date"> */
 function toDateInputValue(d) {
     if (!d) return "";
-    // If already YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-
-    // Try to parse common formats
-    // ISO (with time): 2025-10-08T12:34:56Z
     const iso = Date.parse(d);
     if (!Number.isNaN(iso)) {
         const dt = new Date(iso);
@@ -21,23 +17,28 @@ function toDateInputValue(d) {
         const dd = String(dt.getDate()).padStart(2, "0");
         return `${yyyy}-${mm}-${dd}`;
     }
-
-    // DD/MM/YYYY or DD-MM-YYYY
     const dmY = d.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
     if (dmY) {
         const [, dd, mm, yyyy] = dmY;
         return `${yyyy}-${mm}-${dd}`;
     }
-
-    // YYYY/MM/DD
     const YmD = d.match(/^(\d{4})[/-](\d{2})[/-](\d{2})$/);
     if (YmD) {
         const [, yyyy, mm, dd] = YmD;
         return `${yyyy}-${mm}-${dd}`;
     }
-
-    // Fallback: keep as-is (input will show empty)
     return "";
+}
+
+/** return only fields that actually changed (and are not undefined) */
+function diffPayload(original, current) {
+    const out = {};
+    for (const k of Object.keys(current)) {
+        if (k === "username") continue; // username is read-only (server uses JWT)
+        if (current[k] === undefined) continue;
+        if ((original?.[k] ?? "") !== (current?.[k] ?? "")) out[k] = current[k];
+    }
+    return out;
 }
 
 export default function Profile() {
@@ -50,6 +51,9 @@ export default function Profile() {
     const [err, setErr] = useState("");
     const [editing, setEditing] = useState(false);
 
+    // keep a copy of the loaded data for diffing
+    const [original, setOriginal] = useState(null);
+
     const [form, setForm] = useState({
         username: "",
         firstName: "",
@@ -59,6 +63,13 @@ export default function Profile() {
         gender: "",
         dob: "",
     });
+
+    // OTP modal state
+    const [otpOpen, setOtpOpen] = useState(false);
+    const [otpEmail, setOtpEmail] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [otpErr, setOtpErr] = useState("");
+    const [otpSaving, setOtpSaving] = useState(false);
 
     const onChange = (e) => {
         const { name, value } = e.target;
@@ -71,30 +82,24 @@ export default function Profile() {
             setErr("");
             setLoading(true);
             try {
-                // ✅ Uses JWT; do not pass username
-                const data = await fetchMyProfile();
-
+                const data = await fetchMyProfile(); // server decides username via JWT
                 if (!mounted) return;
 
-                const gender =
-                    data?.gender ?? data?.sex ?? data?.genderCode ?? ""; // be resilient to API naming
-
+                const gender = data?.gender ?? data?.sex ?? data?.genderCode ?? "";
                 const rawDob =
-                    data?.dob ??
-                    data?.dateOfBirth ??
-                    data?.birthDate ??
-                    data?.birthday ??
-                    ""; // handle variants
+                    data?.dob ?? data?.dateOfBirth ?? data?.birthDate ?? data?.birthday ?? "";
 
-                setForm({
+                const next = {
                     username: data?.username || user?.username || username || "",
                     firstName: data?.firstName || "",
                     lastName: data?.lastName || "",
                     email: data?.email || "",
                     phoneNumber: data?.phoneNumber || "",
                     gender,
-                    dob: toDateInputValue(rawDob), // normalize to YYYY-MM-DD so it actually shows
-                });
+                    dob: toDateInputValue(rawDob),
+                };
+                setForm(next);
+                setOriginal(next);
             } catch (e) {
                 if (!mounted) return;
                 setErr(e.message || "Failed to load profile");
@@ -106,19 +111,50 @@ export default function Profile() {
         return () => {
             mounted = false;
         };
-    }, [user?.username]); // reload if auth user changes
+    }, [user?.username]);
 
     async function onSave(e) {
         e?.preventDefault?.();
         setErr("");
         setSaving(true);
         try {
-            // Send everything except username if backend treats it as immutable
-            const { username: _u, ...payload } = form;
+            // only send what changed
+            const payload = diffPayload(original, form);
 
-            // payload.dob is already "YYYY-MM-DD" string from the input; send as-is
-            await updateAccountApi(payload);
-            setEditing(false);
+            // no changes → no-op
+            if (Object.keys(payload).length === 0) {
+                setEditing(false);
+                return;
+            }
+
+            const res = await updateAccountApi(payload);
+
+            // Detect if email change requires OTP.
+            // Prefer backend flags, but fall back to client-side check.
+            const emailChanged = (original?.email ?? "") !== (form?.email ?? "");
+            const otpRequired =
+                res?.emailOtpRequired ??
+                res?.otpRequired ??
+                res?.emailVerificationRequired ??
+                (emailChanged && true);
+
+            const targetEmail =
+                res?.email ??
+                res?.pendingEmail ??
+                res?.emailTarget ??
+                (emailChanged ? form.email : "");
+
+            if (otpRequired && targetEmail) {
+                // open OTP modal
+                setOtpEmail(targetEmail);
+                setOtpCode("");
+                setOtpErr("");
+                setOtpOpen(true);
+            } else {
+                // nothing special; commit locally
+                setOriginal(form);
+                setEditing(false);
+            }
         } catch (e) {
             setErr(e.message || "Failed to update");
         } finally {
@@ -126,11 +162,35 @@ export default function Profile() {
         }
     }
 
+    async function onVerifyOtp(e) {
+        e?.preventDefault?.();
+        if (!otpEmail || !otpCode) {
+            setOtpErr("Enter the 6-digit code we sent.");
+            return;
+        }
+        setOtpErr("");
+        setOtpSaving(true);
+        try {
+            await updateAccountVerifyApi({ email: otpEmail, otp: otpCode });
+
+            // success: treat email as committed
+            const next = { ...form, email: otpEmail };
+            setForm(next);
+            setOriginal(next);
+
+            setOtpOpen(false);
+            setEditing(false);
+        } catch (e) {
+            setOtpErr(e.message || "Verification failed");
+        } finally {
+            setOtpSaving(false);
+        }
+    }
+
     async function onDelete() {
         if (!username) return;
         const yes = window.confirm("Delete your account? This cannot be undone.");
         if (!yes) return;
-
         try {
             await deleteAccountApi({ username });
             await logout();
@@ -147,6 +207,8 @@ export default function Profile() {
             </div>
         );
     }
+
+    const emailWillChange = (original?.email ?? "") !== (form?.email ?? "");
 
     return (
         <div className="min-h-screen bg-neutral-50 px-4">
@@ -174,7 +236,7 @@ export default function Profile() {
                         ) : (
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setEditing(false)}
+                                    onClick={() => { setForm(original); setEditing(false); }}
                                     className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100"
                                 >
                                     Cancel
@@ -191,6 +253,13 @@ export default function Profile() {
                     </div>
 
                     {err && <div className="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">{err}</div>}
+
+                    {/* If email changed during edit, give the user a heads-up */}
+                    {editing && emailWillChange && (
+                        <div className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded">
+                            You changed your email. We’ll send a 6-digit verification code to the new address after you click Save.
+                        </div>
+                    )}
 
                     <form className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Username (read-only) */}
@@ -287,6 +356,48 @@ export default function Profile() {
                     </div>
                 </motion.div>
             </div>
+
+            {/* OTP Modal */}
+            {otpOpen && (
+                <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 px-4">
+                    <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow">
+                        <div className="text-sm text-neutral-700">
+                            We sent a 6-digit code to <span className="font-medium">{otpEmail}</span>.
+                            Enter it below to confirm your new email.
+                        </div>
+
+                        {otpErr && <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">{otpErr}</div>}
+
+                        <form className="mt-3" onSubmit={onVerifyOtp}>
+                            <input
+                                inputMode="numeric"
+                                pattern="\d*"
+                                maxLength={6}
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-center tracking-widest text-lg"
+                                placeholder="••••••"
+                            />
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setOtpOpen(false)}
+                                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={otpSaving || otpCode.length !== 6}
+                                    className="rounded-md bg-neutral-900 text-white px-3 py-1.5 text-sm hover:bg-neutral-800 disabled:opacity-50"
+                                >
+                                    {otpSaving ? "Verifying…" : "Verify"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

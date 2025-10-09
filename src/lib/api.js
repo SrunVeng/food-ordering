@@ -69,10 +69,20 @@ export async function deleteAccountApi({ username }) {
 export async function updateAccountApi(payload) {
     if (!payload) throw new Error("Missing payload");
     try {
-        const { data } = await api.put("/api/v1/user/update-profile", payload);
-        return data?.data ?? { ok: true };
+        const res = await api.put("/api/v1/user/update-profile", payload);
+        return res?.data?.data ?? res?.data ?? { ok: true };
     } catch (err) {
         throw new Error(extractErrorMessage(err, "Failed to update account"));
+    }
+}
+
+export async function updateAccountVerifyApi({ email, otp }) {
+    if (!email || !otp) throw new Error("Missing email/otp");
+    try {
+        const res = await api.post("/api/v1/user/update-profile/verify", { email, otp });
+        return res?.data?.data ?? res?.data ?? { ok: true };
+    } catch (err) {
+        throw new Error(extractErrorMessage(err, "Failed to verify code"));
     }
 }
 
